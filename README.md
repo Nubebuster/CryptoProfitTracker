@@ -6,8 +6,9 @@ This program currently only supports USDT pairings.
 ## How to use
 1. Set your api keys
 2. Set your data
-3. Run the program with the arguments [PAIR, BNBFEE] Example: [BTCUSDT, 0.00075]
-> BNBFEE needs to be supplied so the value of BNB does not have to be queried for every transaction
+3. Run the program with the arguments [PAIR, BNBFee] Example: [BTCUSDT, 0.00075]
+> BNBFee needs to be supplied so the value of BNB does not have to be queried for every transaction. 
+> Moreover, this is a constant value so there is no point querying the BNB price for every transaction.
 ## Set api keys
 Run this program to create the config file. This file will be created in your Documents/BinanceProfitTracker
 ## Set data
@@ -23,4 +24,4 @@ The format is as follows:
 - Add support for mixing trading pairs. For example: ETHUSDT in conjunction with ETHBTC
 - Add more exchange export support
 - Add profit calculation for all trading pairs
-- UI
+- UI for better use and with graphs to plot your profits over time

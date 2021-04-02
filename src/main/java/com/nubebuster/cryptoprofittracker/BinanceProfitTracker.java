@@ -3,16 +3,17 @@ package com.nubebuster.cryptoprofittracker;
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.domain.market.CandlestickInterval;
+import com.nubebuster.cryptoprofittracker.caching.CandleStickCollector;
 import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileWriter;
 import java.math.BigDecimal;
 import java.math.MathContext;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -24,14 +25,14 @@ public class BinanceProfitTracker {
             String pair = args[0];
             double bnbFee = Double.parseDouble(args[1]);
             String apiKey, apiSecret;
-            File documents = new File(getDocumentsPath() + File.separator + "CryptoProfitTracker");
+            File documents = new File(CryptoProfitTrackerUtils.getDocumentsPath());
             if (!documents.exists()) {
                 documents.mkdir();
             }
 
             File configFile = new File(documents, "config.txt");
             if (configFile.exists()) {
-                String[] configData = readData(configFile);
+                String[] configData = CryptoProfitTrackerUtils.readData(configFile);
                 apiKey = configData[0];
                 apiSecret = configData[1];
             } else {
@@ -67,21 +68,26 @@ public class BinanceProfitTracker {
         System.exit(0);
     }
 
-//    private static final String PAIR = "COTIUSDT";// "COTIUSDT";
-
-//    private static final double fee = 0.001, feeBNB = 0.00075;
-
     private BinanceApiRestClient client;
+    private CandleStickCollector candleStickCollector;
 
-    public BinanceProfitTracker(String apiKey, String apiSecret) {
+    public BinanceProfitTracker(String apiKey, String apiSecret) throws Exception {
         BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance(apiKey,
                 apiSecret);
         client = factory.newRestClient();
+        candleStickCollector = new CandleStickCollector(this);
     }
 
-    public void printCalculations(String pair, double bnbFeeValue, Iterator<Row> rows) {
+    public BinanceApiRestClient getBinanceClient() {
+        return client;
+    }
+
+    public void printCalculations(String pair, double bnbFeeValue, Iterator<Row> rows) throws Exception {
 
         List<TradeOrder> orders = new ArrayList<TradeOrder>();
+
+        long oldest = Long.MAX_VALUE;
+        long newest = Long.MIN_VALUE;
 
         while (rows.hasNext()) {
             Row row = rows.next();
@@ -91,7 +97,10 @@ public class BinanceProfitTracker {
             if (!linePair.equals(pair))
                 continue;
 
-            long time = convertToTimeStamp(row.getCell(0).getStringCellValue());
+            long time = CryptoProfitTrackerUtils.convertToTimeStamp(row.getCell(0).getStringCellValue());
+            if (time < oldest) oldest = time;
+            if (time > newest) newest = time;
+
             boolean buy = row.getCell(2).getStringCellValue().equals("BUY");
             double price = Double.parseDouble(row.getCell(3).getStringCellValue());
             double amount = Double.parseDouble(row.getCell(4).getStringCellValue());
@@ -101,6 +110,10 @@ public class BinanceProfitTracker {
 
             orders.add(new TradeOrder(pair, buy, price, amount, total, fee, feeCoin, time));
         }
+
+        //collect all candles from the transaction period to be able to convert at timestamps without querying.
+        candleStickCollector.getCandlesCollectWhenMissing(pair, oldest, newest,
+                CandlestickInterval.FIFTEEN_MINUTES);
 
         double cumProfit = 0;
         double amountInWallet = 0;
@@ -141,6 +154,12 @@ public class BinanceProfitTracker {
 
     }
 
+    private double getHistoricalPrice(String ticker, long timestamp) throws Exception {
+        return Double.parseDouble(candleStickCollector.getCandlesCollectWhenMissing(ticker, timestamp, timestamp
+                        + CryptoProfitTrackerUtils.convertCandleStickIntervalToMs(CandlestickInterval.FIFTEEN_MINUTES),
+                CandlestickInterval.FIFTEEN_MINUTES).get(0).getClose());
+    }
+
     private double roundedToSignificance(double input) {
         BigDecimal bd = new BigDecimal(input);
         return bd.round(new MathContext(8)).doubleValue();
@@ -158,25 +177,4 @@ public class BinanceProfitTracker {
         return Double.parseDouble(client.getPrice(ticker).getPrice());
     }
 
-    private static String getDocumentsPath() throws Exception {
-        Process p = Runtime.getRuntime().exec("reg query \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders\" /v personal");
-        p.waitFor();
-        InputStream in = p.getInputStream();
-        byte[] b = new byte[in.available()];
-        in.read(b);
-        in.close();
-        return new String(b).split("\\s\\s+")[4];
-    }
-
-    private static long convertToTimeStamp(String lineDatum) {
-        return Timestamp.valueOf(lineDatum).getTime();
-    }
-
-    private static String[] readData(File f) throws IOException {
-        FileReader fr = new FileReader(f);
-        char[] data = new char[(int) f.length()];
-        fr.read(data);
-        fr.close();
-        return new String(data).split("\n");
-    }
 }

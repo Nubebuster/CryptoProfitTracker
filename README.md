@@ -13,8 +13,6 @@ https://github.com/Nubebuster/CryptoProfitTracker/releases
 3. Set your data file location in the 'Settings' tab
 4. Go to the 'Main' tab and set your pairing. For example: ADAUSDT
 
-> BNBFee needs to be supplied so the value of BNB does not have to be queried for every transaction. 
-> Moreover, this is a constant value so there is no point querying the BNB price for every transaction.
 ## How to export data from Binance
 1. Go to your trade history
 2. Click on the tab 'Trade History'

@@ -159,6 +159,7 @@ public class BinanceProfitTracker {
         double amountInWallet = 0;
         double volume = 0;
         double accruedFees = 0;
+        double addDisplayFees = 0;
 
         for (TradeOrder order : orders) {
             if (order.isBuy()) {
@@ -179,6 +180,8 @@ public class BinanceProfitTracker {
                     throw new UnexpectedException("Fee coin for " + pair + " was in " + order.getFeeCoin()
                             + ". This is not supported yet. Report this to the github repository.");
                 amountInWallet -= order.getFee();
+                //fees are deducted from total profit. This is in order to not calculate native token fees twice
+                addDisplayFees += order.getFee() * order.getPrice();
             }
         }
 
@@ -191,7 +194,7 @@ public class BinanceProfitTracker {
         log("Amount in wallet: " + roundedToSignificance(amountInWallet) + " (current value: " +
                 Math.floor(walletValue) + ")");
 
-        log("Fees total: " + roundedToSignificance(accruedFees));
+        log("Fees total: " + roundedToSignificance(accruedFees + addDisplayFees));
 
         log("\nTotal profit: " + Math.floor(cumProfit + walletValue - accruedFees) + "\n-----------------------");
     }

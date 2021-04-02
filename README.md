@@ -1,3 +1,4 @@
+![alt text](https://gyazo.com/3f57b57cceb61bed13ec312725bf8a21.png)
 # BinanceProfitTracker
 > Track your profits with your Binance export file
 

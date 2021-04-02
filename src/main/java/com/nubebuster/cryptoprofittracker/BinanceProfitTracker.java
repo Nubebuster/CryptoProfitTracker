@@ -2,6 +2,7 @@ package com.nubebuster.cryptoprofittracker;
 
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
+import com.binance.api.client.domain.market.Candlestick;
 import com.binance.api.client.domain.market.CandlestickInterval;
 import com.nubebuster.cryptoprofittracker.caching.CandleStickCollector;
 import org.apache.poi.openxml4j.opc.OPCPackage;
@@ -14,11 +15,14 @@ import java.io.File;
 import java.io.FileWriter;
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.rmi.UnexpectedException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
 public class BinanceProfitTracker {
+
+    private static final CandlestickInterval CACHE_PRECISION = CandlestickInterval.FIVE_MINUTES;
 
     public static void main(String[] args) {
         try {
@@ -83,7 +87,6 @@ public class BinanceProfitTracker {
     }
 
     public void printCalculations(String pair, double bnbFeeValue, Iterator<Row> rows) throws Exception {
-
         List<TradeOrder> orders = new ArrayList<TradeOrder>();
 
         long oldest = Long.MAX_VALUE;
@@ -111,9 +114,9 @@ public class BinanceProfitTracker {
             orders.add(new TradeOrder(pair, buy, price, amount, total, fee, feeCoin, time));
         }
 
-        //collect all candles from the transaction period to be able to convert at timestamps without querying.
-        candleStickCollector.getCandlesCollectWhenMissing(pair, oldest, newest,
-                CandlestickInterval.FIFTEEN_MINUTES);
+//        //collect all candles from the first to last transaction to be able to convert at timestamps without querying.
+//        List<Candlestick> candles = candleStickCollector.getCandlesCollectWhenMissing(pair, oldest - CryptoProfitTrackerUtils.convertCandleStickIntervalToMs(CACHE_PRECISION), newest + CryptoProfitTrackerUtils.convertCandleStickIntervalToMs(CACHE_PRECISION),
+//                CACHE_PRECISION);
 
         double cumProfit = 0;
         double amountInWallet = 0;
@@ -135,6 +138,9 @@ public class BinanceProfitTracker {
             } else if (order.getFeeCoin().equals("BNB")) {
                 accruedFees += order.getTotal() * bnbFeeValue;
             } else {
+                if (!pair.toLowerCase().contains(order.getFeeCoin().toLowerCase()))
+                    throw new UnexpectedException("Fee coin for " + pair + " was in " + order.getFeeCoin()
+                            + ". This is not supported yet. Report this to the github repository.");
                 amountInWallet -= order.getFee();
             }
         }
@@ -151,13 +157,37 @@ public class BinanceProfitTracker {
         System.out.println("\nFees total: " + roundedToSignificance(accruedFees));
 
         System.out.println("\nTotal profit: " + Math.floor(cumProfit + walletValue - accruedFees));
-
     }
 
-    private double getHistoricalPrice(String ticker, long timestamp) throws Exception {
-        return Double.parseDouble(candleStickCollector.getCandlesCollectWhenMissing(ticker, timestamp, timestamp
-                        + CryptoProfitTrackerUtils.convertCandleStickIntervalToMs(CandlestickInterval.FIFTEEN_MINUTES),
-                CandlestickInterval.FIFTEEN_MINUTES).get(0).getClose());
+    /**
+     * @param candles to get the price from
+     * @param timestamp of the price you want to know
+     * @returns the closing price of the candle. -1 if no candle was found.
+     * You can use {@link #loadHistoricalPrice(String, long)} if this function returns -1.
+     */
+    private double getHistoricalPrice(List<Candlestick> candles, long timestamp) {
+        long startRounded = timestamp - (timestamp % CryptoProfitTrackerUtils.convertCandleStickIntervalToMs(CACHE_PRECISION));
+        for (Candlestick candle : candles) {
+            if (candle.getOpenTime() == startRounded) return Double.parseDouble(candle.getClose());
+        }
+        System.err.println("Is there a candle missing in the candle stick data?");
+        return -1;
+    }
+
+    /**
+     * Use this function if {@link #getHistoricalPrice(List, long)} returns -1.
+     *
+     * @param ticker
+     * @param timestamp
+     * @return
+     * @throws Exception
+     */
+    @Deprecated
+    private double loadHistoricalPrice(String ticker, long timestamp) throws Exception {
+        return Double.parseDouble(candleStickCollector.getCandlesCollectWhenMissing(ticker,
+                timestamp - CryptoProfitTrackerUtils.convertCandleStickIntervalToMs(CACHE_PRECISION),
+                timestamp,
+                CACHE_PRECISION).get(0).getClose());
     }
 
     private double roundedToSignificance(double input) {
@@ -165,16 +195,17 @@ public class BinanceProfitTracker {
         return bd.round(new MathContext(8)).doubleValue();
     }
 
-
-    //Very slow HMMMMMM
-    // maybe just go with %
+    /**
+     * @deprecated this is slow and {@link #getHistoricalPrice(List, long)} should be used for a less precise, cached price.
+     * Alternatively, you can use {@link #loadHistoricalPrice(String, long)} to load the price from the cache.
+     *
+     */
     @Deprecated
-    private Double getPriceAtTime(String ticker, long timestamp) {
+    private Double queryPriceAtTime(String ticker, long timestamp) {
         return Double.parseDouble(client.getCandlestickBars(ticker, CandlestickInterval.ONE_MINUTE, 1, timestamp, timestamp + 60000).get(0).getHigh());
     }
 
     private Double getPrice(String ticker) {
         return Double.parseDouble(client.getPrice(ticker).getPrice());
     }
-
 }

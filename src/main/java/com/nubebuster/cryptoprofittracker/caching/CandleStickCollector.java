@@ -8,10 +8,7 @@ import com.nubebuster.cryptoprofittracker.BinanceProfitTracker;
 import com.nubebuster.cryptoprofittracker.CryptoProfitTrackerUtils;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 
 public class CandleStickCollector {
 
@@ -139,7 +136,7 @@ public class CandleStickCollector {
      * @returns a list of the candles from this period in the [interval] resolution from Binance API
      */
     private List<Candlestick> getCandlesFromInternetAndSave(String symbol, long start, long end, CandlestickInterval interval) throws Exception {
-        log("Getting sticks from internet...");
+        log("Getting sticks from internet for " + symbol + " from " + start + " to " + end);
         long intervalMs = CryptoProfitTrackerUtils.convertCandleStickIntervalToMs(interval);
         int maxQuery = 1000;
 

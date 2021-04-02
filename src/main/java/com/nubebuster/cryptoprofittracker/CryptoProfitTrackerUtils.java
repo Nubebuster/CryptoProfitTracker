@@ -37,6 +37,8 @@ public class CryptoProfitTrackerUtils {
         switch (interval) {
             case ONE_MINUTE:
                 return 60000;
+            case FIVE_MINUTES:
+                return 300000;
             case FIFTEEN_MINUTES:
                 return 900000;
             case TWELVE_HOURLY:

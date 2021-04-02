@@ -1,4 +1,4 @@
-package com.nubebuster.binanceprofittracker;
+package com.nubebuster.cryptoprofittracker;
 
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;

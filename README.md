@@ -1,8 +1,11 @@
 # BinanceProfitTracker
-> Track your profits with your Binance export
-> 
+> Track your profits with your Binance export file
+
 This is a project for tracking your accumulated profits on trading pairs in Binance.
 This program has currently only been tested with USDT pairings. xBTC pairings may be inaccurate. (please tell me if it works, I don't trade with anything other than xUSDT)
+
+## Download
+https://github.com/Nubebuster/CryptoProfitTracker/releases
 ## How to use
 1. ~~Set your api keys in the settings tab~~
 > This is not needed until more features are added
@@ -18,7 +21,7 @@ This program has currently only been tested with USDT pairings. xBTC pairings ma
 3. Click on 'Export Recent Trade History'
 
 This will generate a .xlsx file which you can use for this program
-# TODO
+## TODO
 - Test accurate valuation for non xUSDT pairs
 - Add support for mixing trading pairs. For example: ETHUSDT in conjunction with ETHBTC
 - Add more exchange export support

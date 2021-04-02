@@ -5,12 +5,14 @@ import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.domain.market.Candlestick;
 import com.binance.api.client.domain.market.CandlestickInterval;
 import com.nubebuster.cryptoprofittracker.caching.CandleStickCollector;
+import com.nubebuster.cryptoprofittracker.ui.ProfitTrackerUI;
 import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import javax.swing.*;
 import java.io.File;
 import java.io.FileWriter;
 import java.math.BigDecimal;
@@ -25,10 +27,20 @@ public class BinanceProfitTracker {
     private static final CandlestickInterval CACHE_PRECISION = CandlestickInterval.FIVE_MINUTES;
 
     public static void main(String[] args) {
+
+        JFrame frame = new JFrame();
+        frame.setTitle("Binance profit tracker");
+        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        ProfitTrackerUI ui = new ProfitTrackerUI();
+        frame.add(ui.panel1);
+        frame.pack();
+        frame.setBounds(0, 0, 512, 256);
+        frame.setVisible(true);
+
+
         try {
-            String pair = args[0];
-            double bnbFee = Double.parseDouble(args[1]);
-            String apiKey, apiSecret;
+//            double bnbFee = Double.parseDouble(args[0]);//TODO add this to UI settings
+            double bnbFee = 0.00075;
             File documents = new File(CryptoProfitTrackerUtils.getDocumentsPath());
             if (!documents.exists()) {
                 documents.mkdir();
@@ -37,45 +49,70 @@ public class BinanceProfitTracker {
             File configFile = new File(documents, "config.txt");
             if (configFile.exists()) {
                 String[] configData = CryptoProfitTrackerUtils.readData(configFile);
-                apiKey = configData[0];
-                apiSecret = configData[1];
-            } else {
-                configFile.createNewFile();
-                FileWriter fr = new FileWriter(configFile);
-                fr.write("apiKey=\napiSecret=");
-                fr.flush();
-                fr.close();
-                System.out.println("Set your API keys in " + configFile.getPath());
-                System.exit(0);
-                return;
+                ui.apiKeyTextField.setText(configData[0].replace("apiKey=", ""));
+                ui.secretKeyTextField.setText(configData[1].replace("apiSecret=", ""));
+                ui.dataTextField.setText(configData[2].replace("dataFile=", ""));
             }
 
-            File dataFile = new File(documents, "history.xlsx");
-            if (!dataFile.exists()) {
-                System.out.println("Put your data in " + dataFile.getPath());
-                System.exit(0);
-                return;
+            if (ui.dataTextField.getText() == null || ui.dataTextField.getText().isEmpty()) {
+                ui.dataTextField.setText(CryptoProfitTrackerUtils.getDocumentsPath() + File.separator + "data.xlsx");
             }
 
-            OPCPackage pkg = OPCPackage.open(dataFile);
-            Workbook wb = new XSSFWorkbook(pkg);
-            Sheet sheet = wb.getSheetAt(0);
-            Iterator<Row> rows = sheet.rowIterator();
 
-            BinanceProfitTracker binanceProfitTracker = new BinanceProfitTracker(apiKey,
-                    apiSecret);
-            binanceProfitTracker.printCalculations(pair, bnbFee, rows);
+            ui.printCalculationsButton.addActionListener(e -> {
+                ui.printCalculationsButton.setEnabled(false);
+                ui.output.setText("");
+                try {
+                    File dataFile = new File(ui.dataTextField.getText());
+                    if (!dataFile.exists()) {
+                        System.err.println("Data file not found: " + dataFile.getPath());
+                        ui.printCalculationsButton.setEnabled(true);
+                        return;
+                    }
+                    OPCPackage pkg = OPCPackage.open(dataFile);
+                    Workbook wb = new XSSFWorkbook(pkg);
+                    Sheet sheet = wb.getSheetAt(0);
+                    Iterator<Row> rows = sheet.rowIterator();
+                    BinanceProfitTracker binanceProfitTracker = new BinanceProfitTracker(ui, ui.apiKeyTextField.getText(),
+                            ui.secretKeyTextField.getText());
+                    binanceProfitTracker.printCalculations(ui.ticker.getText(), bnbFee, rows);
+                    pkg.close();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+                ui.printCalculationsButton.setEnabled(true);
+            });
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1);
         }
-        System.exit(0);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                File configFile = new File(CryptoProfitTrackerUtils.getDocumentsPath(), "config.txt");
+                configFile.createNewFile();
+                FileWriter fr = new FileWriter(configFile);
+                fr.write("apiKey=" + ui.apiKeyTextField.getText() + "\napiSecret=" +
+                        ui.secretKeyTextField.getText() + "\ndataFile=" + ui.dataTextField.getText() + "\nNote: this file should not be edited manually.");
+                fr.flush();
+                fr.close();
+                System.out.println("Saved data to " + configFile.getPath());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }));
+    }
+
+    public void log(String s) {
+        System.out.println(s);
+        ui.output.append("\n" + s);
     }
 
     private BinanceApiRestClient client;
     private CandleStickCollector candleStickCollector;
+    private ProfitTrackerUI ui;
 
-    public BinanceProfitTracker(String apiKey, String apiSecret) throws Exception {
+    public BinanceProfitTracker(ProfitTrackerUI ui, String apiKey, String apiSecret) throws Exception {
+        this.ui = ui;
         BinanceApiClientFactory factory = BinanceApiClientFactory.newInstance(apiKey,
                 apiSecret);
         client = factory.newRestClient();
@@ -145,18 +182,18 @@ public class BinanceProfitTracker {
             }
         }
 
-        System.out.println("Data for " + pair);
-        System.out.println("#Orders (BUY+SELL): " + orders.size());
-        System.out.println("Volume: " + roundedToSignificance(volume));
-        System.out.println("Sub Total Profit: " + roundedToSignificance(cumProfit));
+        log("Data for " + pair);
+        log("#Orders (BUY+SELL): " + orders.size());
+        log("Volume: " + roundedToSignificance(volume));
+        log("Sub Total Profit: " + roundedToSignificance(cumProfit));
 
         double walletValue = getPrice(pair) * amountInWallet;
-        System.out.println("Amount in wallet: " + roundedToSignificance(amountInWallet) + " (current value: " +
+        log("Amount in wallet: " + roundedToSignificance(amountInWallet) + " (current value: " +
                 Math.floor(walletValue) + ")");
 
-        System.out.println("\nFees total: " + roundedToSignificance(accruedFees));
+        log("Fees total: " + roundedToSignificance(accruedFees));
 
-        System.out.println("\nTotal profit: " + Math.floor(cumProfit + walletValue - accruedFees));
+        log("\nTotal profit: " + Math.floor(cumProfit + walletValue - accruedFees) + "\n-----------------------");
     }
 
     /**
@@ -198,7 +235,6 @@ public class BinanceProfitTracker {
     /**
      * @deprecated this is slow and {@link #getHistoricalPrice(List, long)} should be used for a less precise, cached price.
      * Alternatively, you can use {@link #loadHistoricalPrice(String, long)} to load the price from the cache.
-     *
      */
     @Deprecated
     private Double queryPriceAtTime(String ticker, long timestamp) {

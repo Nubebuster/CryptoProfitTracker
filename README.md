@@ -25,3 +25,6 @@ This will generate a .xlsx file which you can use for this program
 - Add profit calculation for all trading pairs
 - UI with graphs to plot your profits over time
 - Add support for .csv binance export
+# Troubleshooting
+If the program does not work properly, please run it with a command line to see error stacktraces. 
+These stacktraces can be reported in the github issues section of this repository.

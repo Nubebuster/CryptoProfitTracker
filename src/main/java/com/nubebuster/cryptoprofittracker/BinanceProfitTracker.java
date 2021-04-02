@@ -3,12 +3,18 @@ package com.nubebuster.cryptoprofittracker;
 import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.domain.market.CandlestickInterval;
+import org.apache.poi.openxml4j.opc.OPCPackage;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 public class BinanceProfitTracker {
@@ -16,10 +22,11 @@ public class BinanceProfitTracker {
     public static void main(String[] args) {
         try {
             String apiKey, apiSecret;
-            File documents = new File(getDocumentsPath() +  File.separator + "BinanceProfitTracker" );
+            File documents = new File(getDocumentsPath() +  File.separator + "CryptoProfitTracker" );
             if (!documents.exists()) {
                 documents.mkdir();
             }
+
             File configFile = new File(documents, "config.txt");
             if (configFile.exists()) {
                 String[] configData = readData(configFile);
@@ -35,19 +42,22 @@ public class BinanceProfitTracker {
                 System.exit(0);
                 return;
             }
-            File dataFile = new File(documents, "data.txt");
-            String[] data;
-            if (dataFile.exists()) {
-                data = readData(dataFile);
-            } else {
+
+            File dataFile = new File(documents, "history.xlsx");
+            if (!dataFile.exists()) {
                 System.out.println("Put your data in " + dataFile.getPath());
                 System.exit(0);
                 return;
             }
 
+            OPCPackage pkg = OPCPackage.open(dataFile);
+            Workbook wb = new XSSFWorkbook(pkg);
+            Sheet sheet = wb.getSheetAt(0);
+            Iterator<Row> rows = sheet.rowIterator();
+
             BinanceProfitTracker binanceProfitTracker = new BinanceProfitTracker(apiKey,
                     apiSecret);
-            binanceProfitTracker.printCalculations(PAIR, data);
+            binanceProfitTracker.printCalculations(PAIR, rows);
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1);
@@ -67,26 +77,25 @@ public class BinanceProfitTracker {
         client = factory.newRestClient();
     }
 
-    public void printCalculations(String pair, String[] lines) throws IOException {
+    public void printCalculations(String pair, Iterator<Row> rows) {
 
         List<TradeOrder> orders = new ArrayList<TradeOrder>();
 
-        for (String line : lines) {
-            if (line.isEmpty())
+        while (rows.hasNext()) {
+            Row row = rows.next();
+            if (row.getRowNum()==0) //headers
                 continue;
-
-            String[] lineData = line.split("\t");
-            String linePair = lineData[1];
+            String linePair = row.getCell(1).getStringCellValue();
             if (!linePair.equals(pair))
                 continue;
 
-            long time = convertToTimeStamp(lineData[0]);
-            boolean buy = lineData[2].equals("BUY");
-            double price = Double.parseDouble(lineData[3]);
-            double amount = Double.parseDouble(lineData[4]);
-            double total = Double.parseDouble(lineData[5]);
-            double fee = Double.parseDouble(lineData[6]);
-            String feeCoin = lineData[7].replaceAll("\\r|\\n", "");
+            long time = convertToTimeStamp(row.getCell(0).getStringCellValue());
+            boolean buy = row.getCell(2).getStringCellValue().equals("BUY");
+            double price = Double.parseDouble( row.getCell(3).getStringCellValue());
+            double amount = Double.parseDouble( row.getCell(4).getStringCellValue());
+            double total = Double.parseDouble( row.getCell(5).getStringCellValue());
+            double fee = Double.parseDouble( row.getCell(6).getStringCellValue());
+            String feeCoin =  row.getCell(7).getStringCellValue();
 
             orders.add(new TradeOrder(pair, buy, price, amount, total, fee, feeCoin, time));
         }

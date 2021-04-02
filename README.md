@@ -14,18 +14,28 @@ https://github.com/Nubebuster/CryptoProfitTracker/releases
 4. Go to the 'Main' tab and set your pairing. For example: ADAUSDT
 
 ## How to export data from Binance
+
+#### For a max range of 3 months:
+This will generate a .xlsx file which you can use for this program
 1. Go to your trade history
 2. Click on the tab 'Trade History'
 3. Click on 'Export Recent Trade History'
 
-This will generate a .xlsx file which you can use for this program
+
+#### Limitless (max 3 exports per month, binance cap)
+This will generate a .csv file which you can use for this program
+1. Go to your trade history
+2. Click on the tab 'Trade History'
+3. Click on 'Generate All Trade Statements'
+
+
 ## TODO
 - Test accurate valuation for non xUSDT pairs
 - Add support for mixing trading pairs. For example: ETHUSDT in conjunction with ETHBTC
 - Add more exchange export support
 - Add profit calculation for all trading pairs
 - UI with graphs to plot your profits over time
-- Add support for .csv binance export
 # Troubleshooting
 If the program does not work properly, please run it with a command line to see error stacktraces. 
-These stacktraces can be reported in the github issues section of this repository.
+These stacktraces can be reported in the github issues section of this repository. 
+Be sure to explain how to reproduce the problem. Also include stacktraces.

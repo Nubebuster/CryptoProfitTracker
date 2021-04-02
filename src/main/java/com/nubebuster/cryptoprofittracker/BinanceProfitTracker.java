@@ -13,8 +13,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import javax.swing.*;
-import java.io.File;
-import java.io.FileWriter;
+import java.io.*;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.rmi.UnexpectedException;
@@ -69,14 +68,34 @@ public class BinanceProfitTracker {
                         ui.printCalculationsButton.setEnabled(true);
                         return;
                     }
-                    OPCPackage pkg = OPCPackage.open(dataFile);
-                    Workbook wb = new XSSFWorkbook(pkg);
-                    Sheet sheet = wb.getSheetAt(0);
-                    Iterator<Row> rows = sheet.rowIterator();
+                    List<TradeOrder> orders = null;
+                    if (dataFile.getName().endsWith(".xlsx")) {
+                        OPCPackage pkg = OPCPackage.open(dataFile);
+                        Workbook wb = new XSSFWorkbook(pkg);
+                        Sheet sheet = wb.getSheetAt(0);
+                        Iterator<Row> rows = sheet.rowIterator();
+                        orders = parseOrders(ui.ticker.getText().toUpperCase(), rows);
+                        try {
+                            pkg.close();
+                        } catch (FileNotFoundException ex) {
+                            //if its open in another program
+                        }
+                    } else if (dataFile.getName().endsWith(".csv")) {
+                        List<String> data = new ArrayList<String>();
+                        BufferedReader br = new BufferedReader(new FileReader(dataFile));
+                        String line = "";
+                        while ((line = br.readLine()) != null)
+                            data.add(line);
+                        orders = parseOrders(ui.ticker.getText().toUpperCase(), data);
+                    } else {
+                        System.err.println("Unsupported data format. Current support: [.xlsx, .csv]");
+                        ui.output.setText("Unsupported data format. Current support: [.xlsx, .csv]");
+                        ui.printCalculationsButton.setEnabled(true);
+                        return;
+                    }
                     BinanceProfitTracker binanceProfitTracker = new BinanceProfitTracker(ui, ui.apiKeyTextField.getText(),
                             ui.secretKeyTextField.getText());
-                    binanceProfitTracker.printCalculations(ui.ticker.getText(), bnbFee, rows);
-                    pkg.close();
+                    binanceProfitTracker.printCalculations(ui.ticker.getText().toUpperCase(), bnbFee, orders);
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
@@ -95,7 +114,7 @@ public class BinanceProfitTracker {
                         ui.secretKeyTextField.getText() + "\ndataFile=" + ui.dataTextField.getText() + "\nNote: this file should not be edited manually.");
                 fr.flush();
                 fr.close();
-                System.out.println("Saved data to " + configFile.getPath());
+                System.out.println("Saved settings to " + configFile.getPath());
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -123,12 +142,44 @@ public class BinanceProfitTracker {
         return client;
     }
 
-    public void printCalculations(String pair, double bnbFeeValue, Iterator<Row> rows) throws Exception {
+    /**
+     * For parsing .csv format
+     *
+     * @param pair
+     * @param data
+     * @return
+     */
+    private static List<TradeOrder> parseOrders(String pair, List<String> data) {
         List<TradeOrder> orders = new ArrayList<TradeOrder>();
+        for (String r : data) {
+            if (r.startsWith("Date")) //headers
+                continue;
+            String[] row = r.replaceAll("(\"[^\",]+),([^\"]+\")", "$1$2").replace("\"", "").split(",");
+            String linePair = row[1];
+            if (!linePair.equals(pair))
+                continue;
 
-        long oldest = Long.MAX_VALUE;
-        long newest = Long.MIN_VALUE;
+            long time = CryptoProfitTrackerUtils.convertToTimeStamp(row[0]);
+            boolean buy = row[2].equals("BUY");
+            double price = Double.parseDouble(row[3]);
+            double amount = Double.parseDouble(row[4].replaceAll("[^\\d.]", ""));
+            double total = Double.parseDouble(row[5].replaceAll("[^\\d.]", ""));
+            double fee = Double.parseDouble(row[6].replaceAll("[^\\d.]", ""));
+            String feeCoin = row[6].replaceAll("[\\d.]", "");
+            orders.add(new TradeOrder(pair, buy, price, amount, total, fee, feeCoin, time));
+        }
+        return orders;
+    }
 
+    /**
+     * For parsing .xlsx format
+     *
+     * @param pair
+     * @param rows
+     * @return
+     */
+    private static List<TradeOrder> parseOrders(String pair, Iterator<Row> rows) {
+        List<TradeOrder> orders = new ArrayList<TradeOrder>();
         while (rows.hasNext()) {
             Row row = rows.next();
             if (row.getRowNum() == 0) //headers
@@ -138,9 +189,6 @@ public class BinanceProfitTracker {
                 continue;
 
             long time = CryptoProfitTrackerUtils.convertToTimeStamp(row.getCell(0).getStringCellValue());
-            if (time < oldest) oldest = time;
-            if (time > newest) newest = time;
-
             boolean buy = row.getCell(2).getStringCellValue().equals("BUY");
             double price = Double.parseDouble(row.getCell(3).getStringCellValue());
             double amount = Double.parseDouble(row.getCell(4).getStringCellValue());
@@ -150,8 +198,26 @@ public class BinanceProfitTracker {
 
             orders.add(new TradeOrder(pair, buy, price, amount, total, fee, feeCoin, time));
         }
+        return orders;
+    }
 
-//        //collect all candles from the first to last transaction to be able to convert at timestamps without querying.
+    /**
+     * @param pair        needs to be in upper case. Example: ADAUSDT
+     * @param bnbFeeValue percentage formatted to double
+     * @param orders
+     * @throws Exception
+     */
+    public void printCalculations(String pair, double bnbFeeValue, List<TradeOrder> orders) throws Exception {
+
+//         //collect all candles from the first to last transaction to be able to convert at timestamps without querying.
+//        long oldest = Long.MAX_VALUE;
+//        long newest = Long.MIN_VALUE;
+//        for(TradeOrder order : getOrders(pair, rows)) {
+//            long time = order.getTime();
+//            if (time < oldest) oldest = time;
+//            if (time > newest) newest = time;
+//        }
+//
 //        List<Candlestick> candles = candleStickCollector.getCandlesCollectWhenMissing(pair, oldest - CryptoProfitTrackerUtils.convertCandleStickIntervalToMs(CACHE_PRECISION), newest + CryptoProfitTrackerUtils.convertCandleStickIntervalToMs(CACHE_PRECISION),
 //                CACHE_PRECISION);
 
@@ -186,7 +252,7 @@ public class BinanceProfitTracker {
         }
 
         log("Data for " + pair);
-        log("#Orders (BUY+SELL): " + orders.size());
+        log("#Trades (BUY+SELL): " + orders.size());
         log("Volume: " + roundedToSignificance(volume));
         log("Sub Total Profit: " + roundedToSignificance(cumProfit));
 
@@ -200,7 +266,7 @@ public class BinanceProfitTracker {
     }
 
     /**
-     * @param candles to get the price from
+     * @param candles   to get the price from
      * @param timestamp of the price you want to know
      * @returns the closing price of the candle. -1 if no candle was found.
      * You can use {@link #loadHistoricalPrice(String, long)} if this function returns -1.

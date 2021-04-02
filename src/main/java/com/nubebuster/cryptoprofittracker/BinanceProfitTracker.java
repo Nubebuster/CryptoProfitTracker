@@ -21,8 +21,10 @@ public class BinanceProfitTracker {
 
     public static void main(String[] args) {
         try {
+            String pair = args[0];
+            double bnbFee = Double.parseDouble(args[1]);
             String apiKey, apiSecret;
-            File documents = new File(getDocumentsPath() +  File.separator + "CryptoProfitTracker" );
+            File documents = new File(getDocumentsPath() + File.separator + "CryptoProfitTracker");
             if (!documents.exists()) {
                 documents.mkdir();
             }
@@ -57,7 +59,7 @@ public class BinanceProfitTracker {
 
             BinanceProfitTracker binanceProfitTracker = new BinanceProfitTracker(apiKey,
                     apiSecret);
-            binanceProfitTracker.printCalculations(PAIR, rows);
+            binanceProfitTracker.printCalculations(pair, bnbFee, rows);
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1);
@@ -65,9 +67,9 @@ public class BinanceProfitTracker {
         System.exit(0);
     }
 
-    private static final String PAIR = "COTIUSDT";// "COTIUSDT";
+//    private static final String PAIR = "COTIUSDT";// "COTIUSDT";
 
-    private static final double fee = 0.001, feeBNB = 0.00075;
+//    private static final double fee = 0.001, feeBNB = 0.00075;
 
     private BinanceApiRestClient client;
 
@@ -77,13 +79,13 @@ public class BinanceProfitTracker {
         client = factory.newRestClient();
     }
 
-    public void printCalculations(String pair, Iterator<Row> rows) {
+    public void printCalculations(String pair, double bnbFeeValue, Iterator<Row> rows) {
 
         List<TradeOrder> orders = new ArrayList<TradeOrder>();
 
         while (rows.hasNext()) {
             Row row = rows.next();
-            if (row.getRowNum()==0) //headers
+            if (row.getRowNum() == 0) //headers
                 continue;
             String linePair = row.getCell(1).getStringCellValue();
             if (!linePair.equals(pair))
@@ -91,11 +93,11 @@ public class BinanceProfitTracker {
 
             long time = convertToTimeStamp(row.getCell(0).getStringCellValue());
             boolean buy = row.getCell(2).getStringCellValue().equals("BUY");
-            double price = Double.parseDouble( row.getCell(3).getStringCellValue());
-            double amount = Double.parseDouble( row.getCell(4).getStringCellValue());
-            double total = Double.parseDouble( row.getCell(5).getStringCellValue());
-            double fee = Double.parseDouble( row.getCell(6).getStringCellValue());
-            String feeCoin =  row.getCell(7).getStringCellValue();
+            double price = Double.parseDouble(row.getCell(3).getStringCellValue());
+            double amount = Double.parseDouble(row.getCell(4).getStringCellValue());
+            double total = Double.parseDouble(row.getCell(5).getStringCellValue());
+            double fee = Double.parseDouble(row.getCell(6).getStringCellValue());
+            String feeCoin = row.getCell(7).getStringCellValue();
 
             orders.add(new TradeOrder(pair, buy, price, amount, total, fee, feeCoin, time));
         }
@@ -118,7 +120,7 @@ public class BinanceProfitTracker {
             if (order.getFeeCoin().equals("USDT")) {
                 accruedFees += order.getFee();
             } else if (order.getFeeCoin().equals("BNB")) {
-                accruedFees += order.getTotal() * feeBNB;
+                accruedFees += order.getTotal() * bnbFeeValue;
             } else {
                 amountInWallet -= order.getFee();
             }

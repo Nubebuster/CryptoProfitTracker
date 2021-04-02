@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Maven: com.github.binance-exchange:binance-java-api:master-7781ee0549-1">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/github/binance-exchange/binance-java-api/master-7781ee0549-1/binance-java-api-master-7781ee0549-1.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/com/github/binance-exchange/binance-java-api/master-7781ee0549-1/binance-java-api-master-7781ee0549-1-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/com/github/binance-exchange/binance-java-api/master-7781ee0549-1/binance-java-api-master-7781ee0549-1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

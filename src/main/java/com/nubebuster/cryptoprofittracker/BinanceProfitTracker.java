@@ -4,21 +4,20 @@ import com.binance.api.client.BinanceApiClientFactory;
 import com.binance.api.client.BinanceApiRestClient;
 import com.binance.api.client.domain.market.Candlestick;
 import com.binance.api.client.domain.market.CandlestickInterval;
-import com.nubebuster.cryptoprofittracker.caching.CandleStickCollector;
+import com.nubebuster.cryptoprofittracker.data.FileHandler;
+import com.nubebuster.cryptoprofittracker.data.SettingsHandler;
+import com.nubebuster.cryptoprofittracker.data.TradeOrder;
+import com.nubebuster.cryptoprofittracker.data.UnsupportedFileFormatException;
+import com.nubebuster.cryptoprofittracker.data.caching.CandleStickCollector;
 import com.nubebuster.cryptoprofittracker.ui.ProfitTrackerUI;
-import org.apache.poi.openxml4j.opc.OPCPackage;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 
 import javax.swing.*;
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.rmi.UnexpectedException;
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 public class BinanceProfitTracker {
@@ -40,59 +39,31 @@ public class BinanceProfitTracker {
         try {
 //            double bnbFee = Double.parseDouble(args[0]);//TODO add this to UI settings
             double bnbFee = 0.00075;
-            File documents = new File(CryptoProfitTrackerUtils.getDocumentsPath());
-            if (!documents.exists()) {
-                documents.mkdir();
-            }
 
-            File configFile = new File(documents, "config.txt");
-            if (configFile.exists()) {
-                String[] configData = CryptoProfitTrackerUtils.readData(configFile);
-                ui.apiKeyTextField.setText(configData[0].replace("apiKey=", ""));
-                ui.secretKeyTextField.setText(configData[1].replace("apiSecret=", ""));
-                ui.dataTextField.setText(configData[2].replace("dataFile=", ""));
-            }
-
-            if (ui.dataTextField.getText() == null || ui.dataTextField.getText().isEmpty()) {
-                ui.dataTextField.setText(CryptoProfitTrackerUtils.getDocumentsPath() + File.separator + "data.xlsx");
-            }
+            SettingsHandler settings = SettingsHandler.getInstance();
+            ui.apiKeyTextField.setText(settings.getApiKey());
+            ui.secretKeyTextField.setText(settings.getApiSecret().replace("apiSecret=", ""));
+            ui.dataTextField.setText(settings.getDataFile().replace("dataFile=", ""));
 
 
             ui.printCalculationsButton.addActionListener(e -> {
                 ui.printCalculationsButton.setEnabled(false);
                 ui.output.setText("");
+                List<TradeOrder> orders = null;
                 try {
                     File dataFile = new File(ui.dataTextField.getText());
-                    if (!dataFile.exists()) {
-                        System.err.println("Data file not found: " + dataFile.getPath());
-                        ui.printCalculationsButton.setEnabled(true);
-                        return;
-                    }
-                    List<TradeOrder> orders = null;
-                    if (dataFile.getName().endsWith(".xlsx")) {
-                        OPCPackage pkg = OPCPackage.open(dataFile);
-                        Workbook wb = new XSSFWorkbook(pkg);
-                        Sheet sheet = wb.getSheetAt(0);
-                        Iterator<Row> rows = sheet.rowIterator();
-                        orders = parseOrders(ui.ticker.getText().toUpperCase(), rows);
-                        try {
-                            pkg.close();
-                        } catch (FileNotFoundException ex) {
-                            //if its open in another program
-                        }
-                    } else if (dataFile.getName().endsWith(".csv")) {
-                        List<String> data = new ArrayList<String>();
-                        BufferedReader br = new BufferedReader(new FileReader(dataFile));
-                        String line = "";
-                        while ((line = br.readLine()) != null)
-                            data.add(line);
-                        orders = parseOrders(ui.ticker.getText().toUpperCase(), data);
-                    } else {
-                        System.err.println("Unsupported data format. Current support: [.xlsx, .csv]");
-                        ui.output.setText("Unsupported data format. Current support: [.xlsx, .csv]");
-                        ui.printCalculationsButton.setEnabled(true);
-                        return;
-                    }
+                    orders = FileHandler.loadOrders(dataFile, ui.ticker.getText().toUpperCase());
+                } catch (InvalidFormatException | UnsupportedFileFormatException ex) {
+                    ex.printStackTrace();
+                    ui.output.setText("Unsupported data format. Current support: " + FileHandler.SUPPORTED_FORMATS);
+                    return;
+                } catch (IOException ex) {
+                    ui.output.setText(ex.getMessage());
+                    ex.printStackTrace();
+                    return;
+                }
+
+                try {
                     BinanceProfitTracker binanceProfitTracker = new BinanceProfitTracker(ui, ui.apiKeyTextField.getText(),
                             ui.secretKeyTextField.getText());
                     binanceProfitTracker.printCalculations(ui.ticker.getText().toUpperCase(), bnbFee, orders);
@@ -107,23 +78,14 @@ public class BinanceProfitTracker {
         }
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
-                File configFile = new File(CryptoProfitTrackerUtils.getDocumentsPath(), "config.txt");
-                configFile.createNewFile();
-                FileWriter fr = new FileWriter(configFile);
-                fr.write("apiKey=" + ui.apiKeyTextField.getText() + "\napiSecret=" +
-                        ui.secretKeyTextField.getText() + "\ndataFile=" + ui.dataTextField.getText() + "\nNote: this file should not be edited manually.");
-                fr.flush();
-                fr.close();
-                System.out.println("Saved settings to " + configFile.getPath());
+                SettingsHandler.getInstance().setApiKey(ui.apiKeyTextField.getText());
+                SettingsHandler.getInstance().setApiSecret(ui.secretKeyTextField.getText());
+                SettingsHandler.getInstance().setDataFile(ui.dataTextField.getText());
+                SettingsHandler.getInstance().saveSettings();
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }));
-    }
-
-    public void log(String s) {
-        System.out.println(s);
-        ui.output.append("\n" + s);
     }
 
     private BinanceApiRestClient client;
@@ -140,65 +102,6 @@ public class BinanceProfitTracker {
 
     public BinanceApiRestClient getBinanceClient() {
         return client;
-    }
-
-    /**
-     * For parsing .csv format
-     *
-     * @param pair
-     * @param data
-     * @return
-     */
-    private static List<TradeOrder> parseOrders(String pair, List<String> data) {
-        List<TradeOrder> orders = new ArrayList<TradeOrder>();
-        for (String r : data) {
-            if (r.startsWith("Date")) //headers
-                continue;
-            String[] row = r.replaceAll("(\"[^\",]+),([^\"]+\")", "$1$2").replace("\"", "").split(",");
-            String linePair = row[1];
-            if (!linePair.equals(pair))
-                continue;
-
-            long time = CryptoProfitTrackerUtils.convertToTimeStamp(row[0]);
-            boolean buy = row[2].equals("BUY");
-            double price = Double.parseDouble(row[3]);
-            double amount = Double.parseDouble(row[4].replaceAll("[^\\d.]", ""));
-            double total = Double.parseDouble(row[5].replaceAll("[^\\d.]", ""));
-            double fee = Double.parseDouble(row[6].replaceAll("[^\\d.]", ""));
-            String feeCoin = row[6].replaceAll("[\\d.]", "");
-            orders.add(new TradeOrder(pair, buy, price, amount, total, fee, feeCoin, time));
-        }
-        return orders;
-    }
-
-    /**
-     * For parsing .xlsx format
-     *
-     * @param pair
-     * @param rows
-     * @return
-     */
-    private static List<TradeOrder> parseOrders(String pair, Iterator<Row> rows) {
-        List<TradeOrder> orders = new ArrayList<TradeOrder>();
-        while (rows.hasNext()) {
-            Row row = rows.next();
-            if (row.getRowNum() == 0) //headers
-                continue;
-            String linePair = row.getCell(1).getStringCellValue();
-            if (!linePair.equals(pair))
-                continue;
-
-            long time = CryptoProfitTrackerUtils.convertToTimeStamp(row.getCell(0).getStringCellValue());
-            boolean buy = row.getCell(2).getStringCellValue().equals("BUY");
-            double price = Double.parseDouble(row.getCell(3).getStringCellValue());
-            double amount = Double.parseDouble(row.getCell(4).getStringCellValue());
-            double total = Double.parseDouble(row.getCell(5).getStringCellValue());
-            double fee = Double.parseDouble(row.getCell(6).getStringCellValue());
-            String feeCoin = row.getCell(7).getStringCellValue();
-
-            orders.add(new TradeOrder(pair, buy, price, amount, total, fee, feeCoin, time));
-        }
-        return orders;
     }
 
     /**
@@ -312,5 +215,10 @@ public class BinanceProfitTracker {
 
     private Double getPrice(String ticker) {
         return Double.parseDouble(client.getPrice(ticker).getPrice());
+    }
+
+    public void log(String s) {
+        System.out.println(s);
+        ui.output.append("\n" + s);
     }
 }

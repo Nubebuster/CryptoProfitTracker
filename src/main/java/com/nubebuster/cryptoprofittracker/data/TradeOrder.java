@@ -1,4 +1,4 @@
-package com.nubebuster.cryptoprofittracker;
+package com.nubebuster.cryptoprofittracker.data;
 
 public class TradeOrder {
 

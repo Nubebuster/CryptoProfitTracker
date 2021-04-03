@@ -1,4 +1,4 @@
-package com.nubebuster.cryptoprofittracker.caching;
+package com.nubebuster.cryptoprofittracker.data.caching;
 
 import com.binance.api.client.domain.market.Candlestick;
 import com.binance.api.client.domain.market.CandlestickInterval;
@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nubebuster.cryptoprofittracker.BinanceProfitTracker;
 import com.nubebuster.cryptoprofittracker.CryptoProfitTrackerUtils;
+import com.nubebuster.cryptoprofittracker.data.FileHandler;
 
 import java.io.File;
 import java.util.*;
@@ -16,7 +17,7 @@ public class CandleStickCollector {
     private File cacheFolder;
 
     public CandleStickCollector(BinanceProfitTracker client) throws Exception {
-        cacheFolder = new File(CryptoProfitTrackerUtils.getDocumentsPath(), "cache");
+        cacheFolder = new File(FileHandler.getDocumentsPath(), "cache");
         if (!cacheFolder.exists())
             cacheFolder.mkdir();
 

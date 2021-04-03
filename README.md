@@ -30,11 +30,13 @@ This will generate a .csv file which you can use for this program
 
 
 ## TODO
+- Add Coinbase export support
 - Test accurate valuation for non xUSDT pairs
 - Add support for mixing trading pairs. For example: ETHUSDT in conjunction with ETHBTC
 - Add more exchange export support
 - Add profit calculation for all trading pairs
 - UI with graphs to plot your profits over time
+- Add data file caching with a button to load and reload data
 # Troubleshooting
 If the program does not work properly, please run it with a command line to see error stacktraces. 
 These stacktraces can be reported in the github issues section of this repository. 

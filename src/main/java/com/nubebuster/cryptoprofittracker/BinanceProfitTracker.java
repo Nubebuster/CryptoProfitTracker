@@ -41,6 +41,7 @@ public class BinanceProfitTracker {
             double bnbFee = 0.00075;
 
             SettingsHandler settings = SettingsHandler.getInstance();
+            settings.loadData();
             ui.apiKeyTextField.setText(settings.getApiKey());
             ui.secretKeyTextField.setText(settings.getApiSecret().replace("apiSecret=", ""));
             ui.dataTextField.setText(settings.getDataFile().replace("dataFile=", ""));

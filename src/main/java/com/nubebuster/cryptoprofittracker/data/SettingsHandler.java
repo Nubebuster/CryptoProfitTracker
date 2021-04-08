@@ -10,7 +10,7 @@ public class SettingsHandler {
 
     public static SettingsHandler getInstance() throws IOException, InterruptedException {
         if (instance != null) return instance;
-        return new SettingsHandler();
+        return (instance = new SettingsHandler());
     }
 
 
@@ -53,7 +53,7 @@ public class SettingsHandler {
         loaded = true;
     }
 
-    public void saveSettings() throws IOException, InterruptedException {
+    public void saveSettings() throws IOException {
         if (!loaded)
             return;
         if (!configFile.exists())
